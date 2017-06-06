@@ -9,6 +9,6 @@ Thumbs.db
 .RData
 .Rprofile
 
-# knitr and R markdown cache and output (keep actual .pdf or .html)
-/*_cache/
-/*_files/
+# knitr and R markdown cache and output (keep actual .pdf or .html outputs)
+*_cache
+*_files
