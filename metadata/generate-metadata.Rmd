@@ -1,0 +1,195 @@
+---
+title: "Orchard Project: metadata"
+output: html_document
+---
+
+#### About this document
+
+This is an [R Markdown document](http://rmarkdown.rstudio.com).
+
+## Format metadata for analysis
+
+This project takes place over the course of two days, so changes can be characterized
+as part of the constantly increasing vector of time, or as a function of the diurnal
+cycle. Environmental factors, like sunlight and rain, also very over the arrow
+and cycle of time.
+
+Information about time and environment are in separate file. The goal of this
+document is to import and parse these into a usable format.
+
+### Setup:
+```{r setup, include=F}
+library("checkpoint")
+library("knitr")
+checkpoint("2016-10-01", use.knitr = T)
+
+library("ggplot2")
+library("readr")
+library("dplyr")
+library("readxl")
+library("tibble")
+library("lubridate")
+theme_set(theme_bw())
+opts_chunk$set(cache=F)
+
+```
+
+### Import files
+
+
+```{r importdata}
+meta.fromJim <- read_excel("./orchard_jjm5Oct2016.xlsx", sheet = "sampleInfo")
+meta.fromJim
+
+meta.weather <- read_excel("./Weather Data Summary2012_2014.xlsx",
+                           sheet = "2014 hourly_2-1 through 10-31")
+meta.weather
+
+```
+
+
+
+### Improve weather metadata
+
+Let's construct an useful and unambiguous date-time from the weather metadata file.
+
+The column will have the format `yyyy-mm-dd hh:mm:ss UTC`, however only `yyyy-mm-dd hh`
+are accurate and useful.
+
+Note that I've choosing to round the minutes to the nearest hour (round `18:41`
+to `19:00`), so that we can elegantly match these to measurements taken by our team.
+
+```{r fix-weaather}
+
+head(meta.weather$Date)
+# The $Date column is correct enough
+
+head(meta.weather$Time)
+# From the $Time column, only the minutes and seconds are correct. So just use those.
+
+summary(minute(meta.weather$Time)) # Measurements take on the 41st minute...
+head(hour(meta.weather$Time)) #... starting at midnight and going from there.
+
+
+# Make a new column combining the correct parts of $Date and $Time
+# and name it collection_timestamp to match the other metadata
+meta.weather$collection_timestamp <- meta.weather$Time
+year(meta.weather$collection_timestamp) <- 2014
+month(meta.weather$collection_timestamp) <- month(meta.weather$Date)
+day(meta.weather$collection_timestamp) <- day(meta.weather$Date)
+
+# Round (up in this case) to nearest hour
+meta.weather$collection_timestamp <- round_date(meta.weather$collection_timestamp, unit = "hour")
+
+# Remove blank columns
+meta.weather
+meta.weather$`Julian Day` <- NULL
+meta.weather$`TMP ° F (Daily Ave)` <- NULL
+meta.weather$`Lake Stage` <- NULL
+meta.weather$`Lake vol` <- NULL
+meta.weather$`Surface area` <- NULL
+meta.weather$`Surface area` <- NULL
+meta.weather$`Wetted Area` <- NULL
+meta.weather
+
+tail(table(meta.weather$collection_timestamp, useNA = "always"))
+# Lot's of NAs remain in this data set. Let's drop them.
+meta.weather <- na.exclude(meta.weather)
+
+# Now that we have used the accurate part of the Time column, let's drop it too
+meta.weather$Time <- NULL
+
+# Also add a column with TMP in C
+#meta.weather$`TMP (C)` <- (meta.weather$`TMP ° F` - 32) * (5/9)
+meta.weather$`TMP (C)` <- round((meta.weather$`TMP ° F` - 32) * (5/9), digits = 1)
+unique(sort(meta.weather$`TMP (C)`))
+
+# Remove unneeded `TMP ° F` column
+meta.weather$`TMP ° F` <- NULL
+meta.weather
+
+```
+
+### Improve metadata from Jim
+
+Fix import from excel.
+
+```{r fix-jim}
+meta.fromJim
+
+# This column could contain light reads from the field site itself, but I have
+# not imported this data from Hans.
+meta.fromJim$`incident irradaince` <- NULL
+
+# Remove empty Temperature column
+meta.fromJim$`Temperature (ᵒC)` <- NULL
+
+```
+
+### Combine metadata
+
+Add matching weather data to data provided by Jim.
+
+Also get hourly rate of organic labeled carbon change using `diff_Ave_d13C-organic`.
+
+```{r combine-meta}
+# We will found collection_timestamp so they match up.
+meta.fromJim$collection_timestamp <- round_date(meta.fromJim$collection_timestamp, unit = "minute")
+
+meta.weather
+head(meta.weather$collection_timestamp)
+
+meta.join <- left_join(x = meta.fromJim, y = meta.weather, by = "collection_timestamp")
+meta.join
+```
+
+### Improve metadata
+
+Lets convert `diff_Ave_d13C-organic` into a per-hour measurement. (`fin_diff_Ave_d13C-organic` is already per-hour)
+
+Also, split `fin_diff_Ave_d13C.organic` into new vectors per `Substrate`.
+
+```{r improve-meta}
+summary((meta.join))
+summary(meta.join$`diff_Ave_d13C-organic`)
+head(meta.join$`diff_Ave_d13C-organic`)
+
+# divide by hours and round
+meta.join$`diff_Ave_d13C-organic` <- meta.join$`diff_Ave_d13C-organic` / 6
+# Also divide diff_Stdev by hours
+meta.join$diff_Stdev <- meta.join$diff_Stdev / 6
+
+
+head(meta.join$`diff_Ave_d13C-organic`)
+head(meta.join$`fin_diff_Ave_d13C-organic`)
+# Much more similar. Good.
+
+# Split Substrate + fin_diff_Ave_d13C.organic into new vectors
+meta.join$pp <- meta.join$`fin_diff_Ave_d13C-organic`
+meta.join$hpa <- meta.join$`fin_diff_Ave_d13C-organic`
+meta.join$hpg <- meta.join$`fin_diff_Ave_d13C-organic`
+
+# For our calculated catories of pp, hpa, and hpg what should we set for the
+# samples outside of this group? We use 0 (zero) here instead of NA as it
+# works better with the vegan::capscale() function and does not largely change
+# the output when passed with taxa vectors.
+meta.join$pp[which(meta.join$Substrate != "13C DIC")] <- 0
+meta.join$hpg[which(meta.join$Substrate != "13C Glucose")] <- 0
+meta.join$hpa[which(meta.join$Substrate != "13C Acetate")] <- 0
+
+# Finally, inspect the Error propagation
+head(meta.join$diff_Stdev)
+head(meta.join$`fin_diff_Stdev_d13C-organic`)
+
+names(meta.join)
+```
+
+## Export
+
+Save it as flat text file for use in downstream analysis
+
+```{r export}
+
+write_tsv(meta.join, "generated-meta.tsv", col_names = T)
+
+```
