@@ -1,8 +1,8 @@
-### Heterotrophic and primary productivity influences on multi-kingdom diversity in a hypersaline mat microbiome
-
-##### AKA, The Orchard Project, because incubations were performed in a orchard.
+### Primary and heterotrophic productivity relate to multi-kingdom diversity in a hypersaline mat
 
 Manuscript in preparation!
+
+This has also been called the **Orchard Project**, because incubations were performed in a orchard.
 
 ---
 
