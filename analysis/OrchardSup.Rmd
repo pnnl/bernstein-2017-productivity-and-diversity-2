@@ -1,6 +1,6 @@
 ---
 title: 'Orchard Project: Supplementary'
-output: word_document
+output: html_document
 ---
 
 #### Colin Brislawn, PNNL, Spring 2017
@@ -38,9 +38,6 @@ library("dplyr")
 library("lubridate")
 library("reshape2")
 library("ggrepel")
-#library("car")
-#library("multcomp")
-#library("lme4")
 
 packageVersion('phyloseq')
 theme_set(theme_bw())
