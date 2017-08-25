@@ -1,6 +1,8 @@
 ---
 title: 'Orchard Project: Supplementary'
-output: html_document
+output:
+  word_document: default
+  html_document: default
 ---
 
 #### Colin Brislawn, PNNL, Spring 2017
@@ -22,13 +24,16 @@ This document is directly based on the methods used in the Founder Species
 project, also a collaboration with Hans Bernstein in 2016-2017.
 
 ### Setup:
-```{r setup, results="hide"}
+```{r setup, results="hide", include=F}
 library("checkpoint")
 library("knitr")
 checkpoint("2016-10-01", use.knitr = T)
 
 library("ggplot2")
 library("phyloseq")
+# How to install phyloseq:
+# 1) Let checkpoint() install as much as possible.
+# 2) Run: source('http://bioconductor.org/biocLite.R'); biocLite('phyloseq', suppressUpdates = T)
 library("RColorBrewer")
 library("viridis")
 library("scales")
@@ -39,11 +44,18 @@ library("lubridate")
 library("reshape2")
 library("ggrepel")
 
-packageVersion('phyloseq')
 theme_set(theme_bw())
-set.seed(711)
 opts_chunk$set(cache=TRUE, dev = c('png'), warning = F)
 
+# This let's our special characters like ‰ be saved to out pdfs:
+pdf.options(encoding = "MacRoman.enc")
+# Not sure how well this works cross platforms.
+
+```
+
+```{r setup-2}
+packageVersion('phyloseq')
+set.seed(711)
 ```
 
 ### Import data
@@ -121,7 +133,7 @@ sample_data(full18s) <- meta
 This study includes measurements of several environmental variables over 48 hours.
 Understanding how these vary over time, let us focus on interesting changes.
 
-```{r meta-graphs, fig.height=7, fig.show="hide", results="hide"}
+```{r meta-graphs, fig.height=7, fig.show="hide", results="hide", warning=F}
 table(meta$Time..H., meta$Substrate)
 
 head(meta)
@@ -180,7 +192,7 @@ fig1.a <- fig1.a + geom_line(alpha = 1, color="gray80") + geom_point(size = 1.5)
   scale_color_viridis(option = "C", end = .90) +
   labs(x = "Time (h)", y = 
          #expression(atop("Irradiance", "("~ Wm^{-2}~ ")")) # two lines
-         expression("Irradiance ("~ Wm^{-2}~ ")") # one line
+         expression("Irradiance ("~Wm^{-2}~")") # one line
        ) +
   scale_x_continuous(breaks = c(0, 24, 48), limits = c(0, 48)) +
   theme(
@@ -222,7 +234,7 @@ Here, I'm exporting at 6x3, with the expectation that it will be scaled down whe
 ```{r figure-1, fig.height=6, fig.width=3, cache=F}
 plot_grid(fig1.a, fig1.b, align = "v", rel_heights = c(1.4,3), ncol = 1, labels = c("A", "B"))
 # this should match the height of fig1-cd and their widths should add to 183
-ggsave('fig1-ab.pdf', path = "./figures/", units = "mm", width = 61, height = 122, device = cairo_pdf, scale = 1.2)
+ggsave('fig1-ab.pdf', path = "./figures/", units = "mm", width = 61, height = 122, scale = 1.2)
 ```
 
 #### New Figure: productivity vs irradiance
@@ -295,7 +307,7 @@ fig.pvi <- fig.pvi +
         legend.position = "none")
 fig.pvi
 
-ggsave('fig-sup.pdf', path = "./figures/", units = "mm", width = 89, height = 120, device = cairo_pdf, scale = 0.9)
+ggsave('fig-sup.pdf', path = "./figures/", units = "mm", width = 89, height = 120, scale = 1)
 
 ```
 
@@ -376,7 +388,7 @@ ggplot(sample_data(full18s), aes(sample_sums(full18s))) + geom_histogram(binwidt
 
 sort(sample_sums(full18s))[1:30]
 
-rar.18s <- rarefy_even_depth(full18s, sample.size = 22000)
+rar.18s <- rarefy_even_depth(full18s, sample.size = 22000, rngseed = F, replace = T)
 rar.18s
 
 rar.18s.cohort <- subset_samples(rar.18s, Time..H. != 0 & Substrate %in% c("DIC", "Acetate", "Glucose"))
@@ -388,11 +400,6 @@ rar.18s.cohort
 #### Cohorts used in downstream analysis
 
 These would look good as little heat maps... 
-
-```{r cohorts}
-rar.16s.cohort
-rar.18s.cohort
-```
 
 ```{r cohorts-2, include=F}
 # All samples from MiSeq
@@ -428,6 +435,18 @@ rar.18s.cohort %>% taxa_sums %>% sort %>% subset(. > 0) %>% length
 rar.18s.cohort %>% tax_table %>% data.frame %>% select(Rank2) %>% unique %>% dim # number of Phyla
 
 ```
+
+Due to the rarefaction step, the counts of OTU change slightly. So lets just pull these numbers from the full cohort.
+
+```{r counts-of-otus-full}
+full16s %>% taxa_sums %>% sort %>% subset(. > 0) %>% length # number of OTUs
+full16s %>% tax_table %>% data.frame %>% select(Rank2) %>% unique %>% dim # number of Phyla
+
+full18s %>% taxa_sums %>% sort %>% subset(. > 0) %>% length
+full18s %>% tax_table %>% data.frame %>% select(Rank2) %>% unique %>% dim # number of Phyla
+
+```
+
 
 # Plots
 
@@ -495,7 +514,6 @@ tax_table(rar.18s.cohort.merged3)[,"Rank3"] <- gsub("D_2__", "", tax_table(rar.1
 # Pick level to use:
 rar.16s.cohort.merged <- rar.16s.cohort.merged3
 rar.18s.cohort.merged <- rar.18s.cohort.merged3
-fillrank <- "Rank3"
 
 # Also remove [brackets] from Greengenes candidate taxa
 tax_table(rar.16s.cohort.merged)[,"Rank3"] <- gsub("[][]", "", tax_table(rar.16s.cohort.merged)[,"Rank3"], fixed = F)
@@ -506,17 +524,26 @@ rar.16s.cohort.merged.top <- prune_taxa(names(sort(taxa_sums(rar.16s.cohort.merg
 rar.16s.cohort.merged.top
 sum(taxa_sums(rar.16s.cohort.merged.top)) / sum(taxa_sums(rar.16s.cohort.merged))
 
-# Which 3 taxa do we lose if we take the top 7 taxa
+# Which 3 taxa do we lose if we take the top 7 taxa?
 #sort(taxa_sums(rar.16s.cohort.merged.top))/nsamples(rar.16s.cohort.merged.top)
-#tax_table(rar.16s.cohort.merged.top)[c("OTU_20", "OTU_12", "OTU_13")]
+#tax_table(rar.16s.cohort.merged.top)[c("OTU_49", "OTU_25", "OTU_12")]
+# how much of the full community are these three taxa?
+psmelt(rar.16s.cohort.merged.top) %>% subset(OTU %in% c("OTU_49", "OTU_25", "OTU_12")) %>% select(Abundance) %>% sum()
+# by dropping 8,9,10, we lose ~ 4% of full population. Let's try it.
 
-fig1.c <- plot_bar(rar.16s.cohort.merged.top, x = "Time..H.", fill = fillrank, facet_grid = ~Substrate)
-fig1.c <- fig1.c +
-  scale_fill_viridis(discrete = T, begin = 0, end = .9, name = "16S Taxa") +
+rar.16s.cohort.merged.top <- prune_taxa(names(sort(taxa_sums(rar.16s.cohort.merged), TRUE))[0:7], rar.16s.cohort.merged)
+
+#psmelt(rar.16s.cohort.merged.top) %>% head
+fig1.c <- ggplot(psmelt(rar.16s.cohort.merged.top) %>% arrange(desc(Rank3)), aes(x = Time..H., y = Abundance, fill = Rank3)) +
+  geom_bar(stat = "identity") +
+  facet_grid(~Substrate) +
+  scale_fill_viridis(discrete = T, begin = .1, end = .9, name = "16S Taxa") +
   labs(x = "Time (h)") +
   scale_x_continuous(breaks = c(6, 24, 48)) +
+  scale_y_continuous(limits = c(0, 1)) +
   theme(axis.text.x = element_text(angle = 0, hjust = .5),
-        legend.justification = c("left", "top"),
+        #legend.justification = c("left", "top"), #cowplot ignores this
+#        legend.margin = margin(3,3,3,3),
         strip.background = element_blank())
 fig1.c
 
@@ -526,17 +553,26 @@ rar.18s.cohort.merged.top <- prune_taxa(names(sort(taxa_sums(rar.18s.cohort.merg
 rar.18s.cohort.merged.top
 sum(taxa_sums(rar.18s.cohort.merged.top)) / sum(taxa_sums(rar.18s.cohort.merged))
 
-# Which 3 taxa do we lose if we take the top 7 taxa
+# Which 3 taxa do we lose if we take the top 7 taxa?
 #sort(taxa_sums(rar.18s.cohort.merged.top))/nsamples(rar.18s.cohort.merged.top)
-#tax_table(rar.18s.cohort.merged.top)[c("OTU_77", "OTU_57", "OTU_42")]
+#tax_table(rar.18s.cohort.merged.top)[c("OTU_160", "OTU_203", "OTU_154")]
+# how much of the full community are these three taxa?
+psmelt(rar.18s.cohort.merged.top) %>% subset(OTU %in% c("OTU_160", "OTU_203", "OTU_154")) %>% select(Abundance) %>% sum()
+# ONLY 0.5%. OK, let's drop them.
 
-fig1.d <- plot_bar(rar.18s.cohort.merged.top, x = "Time..H.", fill = fillrank, facet_grid = ~Substrate)
-fig1.d <- fig1.d +
+rar.18s.cohort.merged.top <- prune_taxa(names(sort(taxa_sums(rar.18s.cohort.merged), TRUE))[0:7], rar.18s.cohort.merged)
+
+
+fig1.d <- ggplot(psmelt(rar.18s.cohort.merged.top) %>% arrange(desc(Rank3)), aes(x = Time..H., y = Abundance, fill = Rank3)) +
+  geom_bar(stat = "identity") +
+  facet_grid(~Substrate) +
   scale_fill_viridis(discrete = T, option = "A", begin = .25, direction = -1, name = "18S Taxa") +
   labs(x = "Time (h)") +
   scale_x_continuous(breaks = c(6, 24, 48)) +
+  scale_y_continuous(limits = c(0, 1)) +
   theme(axis.text.x = element_text(angle = 0, hjust = .5),
-        legend.justification = c("left", "top"),
+        #legend.justification = c("left", "top"), # cowplot ignores this
+#        legend.margin = margin(0,0,0,0),
         strip.background = element_blank())
 fig1.d
 
@@ -552,15 +588,16 @@ Here, I'm exporting at 6x6, with the expectation that it will be scaled down whe
 plot_grid(fig1.c, fig1.d, align = "v", ncol = 1, labels = c("C", "D"))
 # hight should match fig1-ab
 # width of both should add up to 183
-ggsave('fig1-cd.pdf', path = "./figures/", units = "mm", width = 122, height = 122, device = cairo_pdf, scale = 1.3)
+ggsave('fig1-cd.pdf', path = "./figures/", units = "mm", width = 122, height = 122, scale = 1.4)
 ```
 
 ## Beta Diversity
 
-Look for microbes that covary with carbon uptake (using the bi-plot)
-
-Because I'm not confident of the intricacies of building ML trees from any MSA
+Because I'm not confident of the intricacies of building ML trees from an MSA
 made from the 18S amplicon, I'll use Bray-Curtis dissimilarities for everything.
+
+Beta diversity is explored later using the biplot, but here we will be using to
+access the uniformity of the mat and our technical replicates.
 
 ```{r beta-colors, fig.show="hide", results="hide", eval=F, include=F}
 bray.16s = ordinate(rar.16s.cohort, method = "PCoA", distance = "bray")
@@ -575,7 +612,7 @@ pl <- scale_color_viridis(option = "C", discrete = T, direction = -1, begin = .3
 v.fill <- scale_fill_viridis(discrete = T, direction = -1, begin = 0, end = 0.9)
 pl.fill <- scale_fill_viridis(option = "C", discrete = T, direction = -1, begin = 0, end = 1)
 
-rb <- scale_color_brewer(palette = "Spectral") #RainBow
+rb <- scale_color_brewer(palette = "Spectral")
 
 p.substrate <- plot_ordination(rar.16s.cohort, bray.16s, color="Substrate") + rb
 p.substrate
@@ -596,11 +633,66 @@ plot_grid(p1, p2, p3, ncol = 1, align = "v")
 
 ```
 
+The question relates to this analysis:
+
+> How homogenous were the mats regarding the microbial diversity? How did the
+> variation in community composition from the samples influence the microcosm
+> experiment? Were enough replicates performed to outweigh this effect?
+
+We can explore this several ways
+1) Exploring time zero samples from "Native Mat" Samples
+2) Compare variation between our technical reps and biologically different samples
+3) Look at initial timepoints (h = 6) (imperfect, as substrate had already been added)
+
+```{r beta-variation-native-mat, include=F, eval=F}
+#We will build the cohorts we need from the original rarefied data sets.
+rar.16s %>% sample_data() %>% select(Substrate) %>% table
+
+rar.16s.native <- subset_samples(rar.16s, Substrate %in% c("Native Mat"))
+rar.18s.native <- subset_samples(rar.18s, Substrate %in% c("Native Mat"))
+
+distance(rar.16s.native, "bray")
+# These are relatively small.
+plot_bar(rar.16s.native, x = "Rank2") + facet_grid(Sample~.)
+
+distance(rar.18s.native, "bray") # Not super useful with a single sample
+
+```
+
+This second test
+```{r beta-variation-reps-vs-biology}
+df = as(sample_data(rar.16s.cohort), "data.frame")
+d = distance(rar.16s.cohort, "bray")
+adonis(d ~ Substrate + timepoint + rep., df, permutations = 9999)
+
+df = as(sample_data(rar.18s.cohort), "data.frame")
+d = distance(rar.18s.cohort, "bray")
+adonis(d ~ Substrate + timepoint + rep., df, permutations = 9999)
+
+```
+
+The measurable effect of the technical rep is negligible compared to the effect of Substrate and timepoint.
+
+Third test:
+
+> I think we need to look at the beta diversity of the mat by only considering the earliest time points from each treatment (and/or whole experiment). My thought is that if there are not distinct clusters corresponding to each treatment then we can conclude that the microbiome is relatively homogenous between microcosms. 
+
+```{r beta-variation-t1}
+rar.16s.t1 <- subset_samples(rar.16s.cohort, timepoint %in% c("T1", "T6"))
+bray.16s.t1 = ordinate(rar.16s.t1, method = "PCoA", distance = "bray")
+plot_ordination(rar.16s.t1, bray.16s.t1, color="Substrate", shape = "timepoint") + geom_line()
+
+rar.18s.t1 <- subset_samples(rar.18s.cohort, timepoint %in% c("T1", "T6"))
+bray.18s.t1 = ordinate(rar.18s.t1, method = "PCoA", distance = "bray")
+plot_ordination(rar.18s.t1, bray.18s.t1, color="Substrate", shape = "timepoint") + geom_line()
+
+```
+
+So after 6 hours, a treatment effect is already showing in these samples. I think the second method makes the most sense.
+
 
 ```{r adonistest, include=F, eval=F}
-# I'm not sure that ADONIS handles timed data well. The strata= argument could
-# help, but I need feedback on this.
-
+# The strata= argument could help with time series data.
 df = as(sample_data(rar.16s.cohort), "data.frame")
 d = distance(rar.16s.cohort, "bray")
 cohort.adonis = adonis(d ~ Substrate + SOLR.W.m.m + Time..H., df)
@@ -749,8 +841,10 @@ alpha.16s.alt <- ggplot(mdf.16s, aes(Time..H., value))
 alpha.16s.alt <- alpha.16s.alt + 
   geom_smooth(color = viridis(n = 10)[8]) +
   geom_jitter(width = 0.1) +
-  facet_grid(facets = variable~Substrate, scales = "free_y") +
-  labs(x = "Time (h)", title = "16S OTUs") +
+  facet_grid(facets = variable~Substrate, scales = "free_y", switch = "y") +
+  labs(x = "Time (h)"
+       #, title = "16S OTUs"
+       ) +
   theme(legend.position = "none",
             strip.background = element_blank(),
             axis.title.y = element_blank()
@@ -762,8 +856,10 @@ alpha.18s.alt <- ggplot(mdf.18s, aes(Time..H., value))
 alpha.18s.alt <- alpha.18s.alt + 
   geom_smooth(color = magma(n = 10)[9]) +
   geom_jitter(width = 0.1) +
-  facet_grid(facets = variable~Substrate, scales = "free_y") +
-  labs(x = "Time (h)", title = "18S OTUs") +
+  facet_grid(facets = variable~Substrate, scales = "free_y", switch = "y") +
+  labs(x = "Time (h)"
+       #, title = "18S OTUs"
+       ) +
   theme(legend.position = "none",
             strip.background = element_blank(),
             axis.title.y = element_blank()
@@ -773,12 +869,61 @@ alpha.18s.alt <- alpha.18s.alt +
 #alpha.18s.alt
 
 plot_grid(alpha.16s.alt, alpha.18s.alt,
-          labels = c("A", "B"),
-          align = "v", ncol = 1)
+          #labels = c("A", "B"),
+          labels = c("A: 16S OTUs", "B: 18S OTUs"),
+          align = "v", ncol = 1, hjust = -0.05)
 
-ggsave('fig2-1col.pdf', path = "./figures/", units = "mm", width = 89, height = 120, device = cairo_pdf, scale = 1.6)
+ggsave('fig2-1col.pdf', path = "./figures/", units = "mm", width = 89, height = 120, scale = 1.7)
 
 ```
+
+### Additional analysis of alpha diverisity
+
+Reviewer's comment:
+> L142: Please also provide that Shannon diversity index and it is more widespread...
+
+
+```{r alpha.additional}
+rich.16s.alt <- estimate_richness_mod(rar.16s.cohort, measures = c("Shannon", "Pielou"))
+rich.18s.alt <- estimate_richness_mod(rar.18s.cohort, measures = c("Shannon", "Pielou"))
+
+# Rename for graphing
+graphnames <- c("Shannon", "Pielou")
+names(rich.16s.alt) <- graphnames
+names(rich.18s.alt) <- graphnames
+
+# merge richness with metadata
+DF.16s.alt <- merge(rich.16s.alt, sample_data(rar.16s.cohort), by = 0)
+DF.18s.alt <- merge(rich.18s.alt, sample_data(rar.18s.cohort), by = 0)
+
+DF.16s.alt = melt(DF.16s.alt, measure.vars = graphnames)
+DF.18s.alt = melt(DF.18s.alt, measure.vars = graphnames)
+#head(mdf.16s)
+
+DF.16s.alt$Time..H.num <- as.numeric(DF.16s.alt$Time..H.)
+DF.18s.alt$Time..H.num <- as.numeric(DF.18s.alt$Time..H.)
+
+
+ggplot(DF.16s.alt, aes(Time..H., value)) +
+  geom_smooth(color = viridis(n = 10)[8]) +
+  geom_jitter(width = 0.1) +
+  facet_grid(facets = variable~Substrate, scales = "free_y", switch = "y") +
+  labs(x = "Time (h)", title = "16S OTUs") +
+  theme(legend.position = "none",
+            strip.background = element_blank(),
+            axis.title.y = element_blank())
+
+ggplot(DF.18s.alt, aes(Time..H., value)) +
+  geom_smooth(color = magma(n = 10)[9]) +
+  geom_jitter(width = 0.1) +
+  facet_grid(facets = variable~Substrate, scales = "free_y", switch = "y") +
+  labs(x = "Time (h)", title = "18S OTUs") +
+  theme(legend.position = "none",
+            strip.background = element_blank(),
+            axis.title.y = element_blank())
+
+```
+
 
 #### Alpha over time stat test
 
@@ -898,8 +1043,8 @@ alpha.16s.light.only <- alpha.16s.light.only +
   #geom_boxplot(color = "gray", outlier.size = 0) +
   geom_smooth(method = "lm", color = viridis(n = 10)[8]) +
   geom_jitter(width = 0) +
-  facet_grid(facets = variable~Substrate, scales = "free_y") + #, switch = "y") +
-  labs(title = "16S OTUs", x = expression("Irradiance ("~ Wm^{-2}~ ")")) +
+  facet_grid(facets = variable~Substrate, scales = "free_y", switch = "y") +
+  labs(x = expression("Irradiance ("~ Wm^{-2}~ ")")) +
   geom_text(data = df2, aes(x = graphx, y = graphy, label = eq), color = '#777777', parse = TRUE) +
   #v.c + # also add color = Time..H.num to aes() to use this
   theme(legend.position = "right",
@@ -928,8 +1073,8 @@ alpha.18s.light.only <- ggplot(mdf.18s.light, aes(SOLR.W.m.m, value))
 alpha.18s.light.only <- alpha.18s.light.only + 
   geom_smooth(method = "lm", color = magma(n = 10)[9]) +
   geom_jitter(width = 0) +
-  facet_grid(facets = variable~Substrate, scales = "free_y") +
-  labs(title = "18S OTUs", x = expression("Irradiance ("~ Wm^{-2}~ ")")) +
+  facet_grid(facets = variable~Substrate, scales = "free_y", switch = "y") +
+  labs(x = expression("Irradiance ("~ Wm^{-2}~ ")")) +
   geom_text(data = df2, aes(x = graphx, y = graphy, label = eq), color = '#777777', parse = TRUE) +
   theme(legend.position = "right",
         strip.background = element_blank(),
@@ -942,11 +1087,11 @@ alpha.18s.light.only
 
 ```{r alpha-graph-light-only-graph, fig.height=8, fig.width=6, cache=F}
 plot_grid(alpha.16s.light.only, alpha.18s.light.only,
-          labels = c("A", "B"),
-          align = "v", ncol = 1)
+          labels = c("A: 16S OTUs", "B: 18S OTUs"),
+          align = "v", ncol = 1, hjust = -0.05)
 
 #ggsave('fig3-1.5col.pdf', path = "./figures/", units = "mm", width = 120, height = 160, device = cairo_pdf, scale = 1.3)
-ggsave('fig3-1col.pdf', path = "./figures/", units = "mm", width = 89, height = 120, device = cairo_pdf, scale = 1.6)
+ggsave('fig3-1col.pdf', path = "./figures/", units = "mm", width = 89, height = 120, scale = 1.7)
 
 ```
 
@@ -987,7 +1132,7 @@ df2 <- data.frame(eq = c(eqns),
                   variable = c("Richness", "Richness", "Richness",
                                "Evenness", "Evenness", "Evenness"),
                   graphx = c(0, 20, 60, -0.21, 40, 60), 
-                  graphy = c(400, 393, 400, .0226, .022, .022))
+                  graphy = c(430, 430, 430, .020, .020, .020))
 #df2
 
 alpha.16s.1 <- ggplot(mdf.16s, aes(fin_diff_Ave_d13C.organic, value))
@@ -995,8 +1140,8 @@ alpha.16s.1 <- alpha.16s.1 +
   #geom_boxplot(color = "gray", outlier.size = 0) +
   geom_smooth(method = "lm", color = viridis(n = 10)[8]) +
   geom_jitter(width = 0) +
-  facet_grid(facets = variable~Substrate, scales = "free") +
-  labs(title = "16S OTUs", x = expression("Productivity: " ~ Delta~delta^13~C / Delta ~t ~"  (‰"~ h^-1~")")) +
+  facet_grid(facets = variable~Substrate, scales = "free", switch = "y") +
+  labs(x = expression("Productivity: " ~ Delta~delta^13~C / Delta ~t ~"  (‰"~ h^-1~")")) +
   #v.c + # also add color = Time..H.num to aes() to use this
   geom_text(data = df2, aes(x = graphx, y = graphy, label = eq), color = '#777777', parse = TRUE) +
   theme(legend.position = "right",
@@ -1019,7 +1164,7 @@ df2 <- data.frame(eq = c(eqns),
                   variable = c("Richness", "Richness", "Richness",
                                "Evenness", "Evenness", "Evenness"),
                   graphx = rep(c(0, 30, 50), 2), 
-                  graphy = c(500, 650, 500, .025, .025, .025))
+                  graphy = c(540, 650, 540, .025, .025, .025))
 #df2
 
 
@@ -1027,8 +1172,8 @@ alpha.18s.1 <- ggplot(mdf.18s, aes(fin_diff_Ave_d13C.organic, value))
 alpha.18s.1 <- alpha.18s.1 + 
   geom_smooth(method = "lm", color = magma(n = 10)[9]) +
   geom_jitter(width = 0) +
-  facet_grid(facets = variable~Substrate, scales = "free") +
-  labs(title = "18S OTUs", x = expression("Productivity: " ~ Delta~delta^13~C / Delta ~t ~"  (‰"~ h^-1~")")) +
+  facet_grid(facets = variable~Substrate, scales = "free", switch = "y") +
+  labs(x = expression("Productivity: " ~ Delta~delta^13~C / Delta ~t ~"  (‰"~ h^-1~")")) +
   #v.c + # also add color = Time..H.num to aes() to use this
   geom_text(data = df2, aes(x = graphx, y = graphy, label = eq), color = '#777777', parse = TRUE) +
   theme(legend.position = "right",
@@ -1044,11 +1189,11 @@ alpha.18s.1
 
 ```{r alpha-prod-graph, fig.height=8.5, fig.width=6, cache=F}
 plot_grid(alpha.16s.1, alpha.18s.1,
-          labels = c("A", "B"),
-          align = "v", ncol = 1)
+          labels = c("A: 16S OTUs", "B: 18S OTUs"),
+          align = "v", ncol = 1, hjust = -0.05)
 
 #ggsave('fig4-1.5col.pdf', path = "./figures/", units = "mm", width = 120, height = 160, device = cairo_pdf, scale = 1.3)
-ggsave('fig4-1col.pdf', path = "./figures/", units = "mm", width = 89, height = 120, device = cairo_pdf, scale = 1.6)
+ggsave('fig4-1col.pdf', path = "./figures/", units = "mm", width = 89, height = 120, scale = 1.7)
 
 ```
 
@@ -1115,10 +1260,10 @@ alpha.16s.4
 
 
 
+
 ## RA graphs for bioplot
 
-The same RA graphs used in the barplots will be used _before_ the merging of
-samples. Here, we regenerate these from the rarefied  cohorts.
+Taxa, merged at the Family level, will be use as vectors in the biplot.
 
 ```{r biplot-prep-ra, fig.width=8, results="hide", fig.show="hide"}
 # Glom OTUs and transform to RA
@@ -1220,7 +1365,7 @@ cap.16s = ordinate(rar.16s.w_tax, "CAP", dist.16s,
                      pp + hpa + hpg + 
                      f__Rhodospirillaceae + f__Phormidiaceae + f__Spirochaetaceae + f__Saprospiraceae + f__A4b + f__Rhodobacteraceae + f__Hyphomonadaceae + f__Pseudanabaenaceae + f__Cyclobacteriaceae + f__Anaerolineaceae)
 
-# Two alternative ordinations. These show that choise of carbon variable does not change ordination much
+# Two alternative ordinations. These show that choice of carbon variable does not change ordination much
 #cap.16s = ordinate(rar.16s.w_tax, "CAP", dist.16s,
 #                   ~ Time..H. + SOLR.W.m.m + 
 #                     fin_diff_Ave_d13C.organic + 
@@ -1304,8 +1449,8 @@ plot <- plot_ordination(rar.16s.w_tax, cap.16s, "samples", shape="Substrate", co
 #  scale_color_brewer(palette = "Set2")
 
 
-plot <- plot_ordination(rar.16s.w_tax, cap.16s, "samples", shape = "Substrate")
-plot <- plot + geom_point(color = "lightgrey") +
+plot.16s <- plot_ordination(rar.16s.w_tax, cap.16s, "samples", shape = "Substrate")
+plot.16s <- plot.16s + geom_point(color = "lightgrey") +
 	geom_path(aes(x = x, y=y, shape = NULL), data = circleFun(c(0,0), 1, 100), color="lightgrey") + 
 	geom_segment(data = cap16s.v, aes(x = 0, xend = CAP1, y = 0, yend = CAP2, color = category, shape = NULL),
 	             arrow = arrow(length = unit(0.25, "cm"))) +
@@ -1315,7 +1460,7 @@ plot <- plot + geom_point(color = "lightgrey") +
 						) +
   theme(legend.position = "none") +
   labs(title = "16S OTUs")
-plot
+plot.16s
 
 plot.18s <- plot_ordination(rar.18s.w_tax, cap.18s, "samples", shape = "Substrate")
 plot.18s <- plot.18s + geom_point(color = "lightgrey") +
@@ -1329,18 +1474,22 @@ plot.18s <- plot.18s + geom_point(color = "lightgrey") +
   labs(title = "18S OTUs", color = "Vector")
 plot.18s
 
+
+
 ```
 
 
 
 ```{r biplot-ggplot-graph, fig.height=4.8, fig.width=10, cache=F}
-plot_grid(plot, plot.18s,
+plot_grid(plot.16s, plot.18s,
           labels = c("A", "B"),
-          align = "h", nrow = 1, rel_widths = c(1, 1.25))
+          align = "h", nrow = 1, rel_widths = c(1, 1.3))
 
-ggsave('fig5-2col.pdf', path = "./figures/", units = "mm", width = 183, height = 84, device = cairo_pdf, scale = 1.3)
+ggsave('fig5-2col.pdf', path = "./figures/", units = "mm", width = 183, height = 82, scale = 1.4)
 
 ```
+
+
 
 
 ```{r save-and-quit, cache=F}
@@ -1348,6 +1497,8 @@ ggsave('fig5-2col.pdf', path = "./figures/", units = "mm", width = 183, height =
 knitr::knit_exit(append = F)
 
 ```
+
+
 
 
 
