@@ -20,11 +20,10 @@ This project makes use of many packages, especially Phyloseq <https://joey711.gi
 The goal of this document it to provide a comprehensive overview of all methods
 used in the paper for visualizing amplicon data.
 
-This document is directly based on the methods used in the Founder Species
-project, also a collaboration with Hans Bernstein in 2016-2017.
+This document is directly based on the methods used in [Trade-offs between microbiome diversity and productivity in a stratified microbial mat](https://github.com/pnnl/bernstein-2016-productivity-and-diversity). Both projects are a collaboration with Hans Bernstein in 2016-2017.
 
 ### Setup:
-```{r setup, results="hide", include=F}
+```{r setup, results="hide"}
 library("checkpoint")
 library("knitr")
 checkpoint("2016-10-01", use.knitr = T)
@@ -53,15 +52,22 @@ pdf.options(encoding = "MacRoman.enc")
 
 ```
 
-```{r setup-2}
+```{r setup-2, cache=F}
 packageVersion('phyloseq')
 set.seed(711)
 ```
 
+The function `set.seed()` is used here to provide a reproducible starting point
+for random number generation. Random sampling is used throughout this document,
+from `phyloseq::rarefy_even_depth()` to `vegan::adonis()`, and small changes to
+the order in which sampling is performed could change the results.
+
+
+
 ### Import data
 
 Our work here will focus on two amplicon data sets. One from the 16S gene, the
-other from the 18S gene. Because there amplicons came from different primers and
+other from the 18S gene. Because these amplicons came from different primers and
 are expected to target different genes (of different evolutionary history,
 length, complexity, etc) they will be analyzed separately. (This also makes the
 stats simpler.)
@@ -237,11 +243,10 @@ plot_grid(fig1.a, fig1.b, align = "v", rel_heights = c(1.4,3), ncol = 1, labels 
 ggsave('fig1-ab.pdf', path = "./figures/", units = "mm", width = 61, height = 122, scale = 1.2)
 ```
 
-#### New Figure: productivity vs irradiance
+#### Sup Figure 1: productivity vs irradiance
 
-Notes to Hans: This graph does not get a second panel for 16S and 18S because
-only a single measurement of carbon uptake was made. This shows one of the
-limitations of this measure.
+Note: This graph does shows a single panel because
+only a single measurement of carbon uptake was made.
 
 
 ```{r figure-prod-vs-I, fig.height=4.5, fig.width=3.5, results="hide"}
@@ -397,11 +402,9 @@ rar.18s.cohort
 ```
 
 
-#### Cohorts used in downstream analysis
+#### Characterize cohorts used in downstream analysis
 
-These would look good as little heat maps... 
-
-```{r cohorts-2, include=F}
+```{r cohorts-2, include=T}
 # All samples from MiSeq
 table(sample_data(full16s)$Time..H., sample_data(full16s)$Substrate)
 # Samples with good depth
@@ -426,6 +429,7 @@ of the study design.
 
 Don't merge now, but maybe merge later for clear graphs.
 
+#### Counts of OTUs and phyla in each data set
 
 ```{r counts-of-otus}
 rar.16s.cohort %>% taxa_sums %>% sort %>% subset(. > 0) %>% length # number of OTUs
@@ -593,11 +597,12 @@ ggsave('fig1-cd.pdf', path = "./figures/", units = "mm", width = 122, height = 1
 
 ## Beta Diversity
 
+Usually, UniFrac distances are used to characterize beta diversity.
 Because I'm not confident of the intricacies of building ML trees from an MSA
 made from the 18S amplicon, I'll use Bray-Curtis dissimilarities for everything.
 
 Beta diversity is explored later using the biplot, but here we will be using to
-access the uniformity of the mat and our technical replicates.
+access the uniformity of the mat and our biological replicates.
 
 ```{r beta-colors, fig.show="hide", results="hide", eval=F, include=F}
 bray.16s = ordinate(rar.16s.cohort, method = "PCoA", distance = "bray")
@@ -633,18 +638,19 @@ plot_grid(p1, p2, p3, ncol = 1, align = "v")
 
 ```
 
-The question relates to this analysis:
+This question is related to this analysis:
 
 > How homogenous were the mats regarding the microbial diversity? How did the
 > variation in community composition from the samples influence the microcosm
 > experiment? Were enough replicates performed to outweigh this effect?
 
-We can explore this several ways
-1) Exploring time zero samples from "Native Mat" Samples
-2) Compare variation between our technical reps and biologically different samples
-3) Look at initial timepoints (h = 6) (imperfect, as substrate had already been added)
+We can explore sources of variation several ways:
+
+1) Compare variation between our technical reps and biologically different samples
+2) Look at initial timepoints (T0 and T1) and compare magnitude of difference between samples. (Imperfect, as substrate has already been added.)
 
 ```{r beta-variation-native-mat, include=F, eval=F}
+# 3) Compare our initial samples of the native mat
 #We will build the cohorts we need from the original rarefied data sets.
 rar.16s %>% sample_data() %>% select(Substrate) %>% table
 
@@ -656,10 +662,12 @@ distance(rar.16s.native, "bray")
 plot_bar(rar.16s.native, x = "Rank2") + facet_grid(Sample~.)
 
 distance(rar.18s.native, "bray") # Not super useful with a single sample
-
+# This is not super helpful because it does not compare differences withint
+# between our microcosms.
 ```
 
-This second test
+
+#### 1) Compare variation between our technical reps and biologically different samples
 ```{r beta-variation-reps-vs-biology}
 df = as(sample_data(rar.16s.cohort), "data.frame")
 d = distance(rar.16s.cohort, "bray")
@@ -673,22 +681,39 @@ adonis(d ~ Substrate + timepoint + rep., df, permutations = 9999)
 
 The measurable effect of the technical rep is negligible compared to the effect of Substrate and timepoint.
 
-Third test:
+#### 2) Look at initial timepoints (T0 and T1) and compare magnitude of difference between samples.
 
-> I think we need to look at the beta diversity of the mat by only considering the earliest time points from each treatment (and/or whole experiment). My thought is that if there are not distinct clusters corresponding to each treatment then we can conclude that the microbiome is relatively homogenous between microcosms. 
+Imperfect, as substrate has already been added.
 
-```{r beta-variation-t1}
-rar.16s.t1 <- subset_samples(rar.16s.cohort, timepoint %in% c("T1", "T6"))
-bray.16s.t1 = ordinate(rar.16s.t1, method = "PCoA", distance = "bray")
-plot_ordination(rar.16s.t1, bray.16s.t1, color="Substrate", shape = "timepoint") + geom_line()
+Often in this analysis, the pairwise beta diversity matrix is used as input to an ordination.
+In this case, I'm going to look at the distribution of Bray–Curtis dissimilarities directly.
 
-rar.18s.t1 <- subset_samples(rar.18s.cohort, timepoint %in% c("T1", "T6"))
-bray.18s.t1 = ordinate(rar.18s.t1, method = "PCoA", distance = "bray")
-plot_ordination(rar.18s.t1, bray.18s.t1, color="Substrate", shape = "timepoint") + geom_line()
+```{r beta-variation-tzero, fig.width=3}
+rar.16s %>% sample_data() %>% select(timepoint) %>% table
+#bray.16s.zero = ordinate(rar.16s.zero, method = "PCoA", distance = "bray")
+#plot_ordination(rar.16s.zero, bray.16s.zero, color="Substrate", shape = "timepoint") + geom_line()
+
+# 16s
+rar.16s.zero <- subset_samples(rar.16s, timepoint %in% c("T0", "T1"))
+distance(rar.16s.zero, "bray") %>% as.list %>% unlist() %>% summary()
+
+
+distance(rar.16s.zero, "bray") %>% as.list %>% as.data.frame() %>% melt() %>%
+  ggplot(mapping = aes(x = "16S samples at T1\n(6 hours)", y = value)) +
+  labs(y = "Bray–Curtis dissimilarities") +
+  geom_violin() + geom_boxplot() + geom_jitter(width = .2)
+
+# 18s
+rar.18s.zero <- subset_samples(rar.18s, timepoint %in% c("T0", "T1"))
+distance(rar.18s.zero, "bray") %>% as.list %>% unlist() %>% summary()
+distance(rar.18s.zero, "bray") %>% as.list %>% as.data.frame() %>% melt() %>%
+  ggplot(mapping = aes(x = "18S samples at T1\n(6 hours)", y = value)) +
+  labs(y = "Bray–Curtis dissimilarities") +
+  geom_violin() + geom_boxplot() + geom_jitter(width = .2)
 
 ```
 
-So after 6 hours, a treatment effect is already showing in these samples. I think the second method makes the most sense.
+So even after 6 hours of incubation, the 16s community has just started to respond to substrate, while the 18S is much more variable.
 
 
 ```{r adonistest, include=F, eval=F}
@@ -879,9 +904,7 @@ ggsave('fig2-1col.pdf', path = "./figures/", units = "mm", width = 89, height = 
 
 ### Additional analysis of alpha diverisity
 
-Reviewer's comment:
-> L142: Please also provide that Shannon diversity index and it is more widespread...
-
+This is the same graphs from above, using Shannon and Pielou's indexes.
 
 ```{r alpha.additional}
 rich.16s.alt <- estimate_richness_mod(rar.16s.cohort, measures = c("Shannon", "Pielou"))
@@ -927,7 +950,7 @@ ggplot(DF.18s.alt, aes(Time..H., value)) +
 
 #### Alpha over time stat test
 
-Because n within each group is small (and sometimes missing reps), let's test for equal variance.
+Because `n` within each group is small, let's test for equal variance.
 
 Then, use a classic `anova()` test on each combination of Substrate and alpha.
 
@@ -997,7 +1020,7 @@ kable(
 
 ### Figure 3: Alpha over Irradiance
 
-This set of graph shows alpha ~ Light only for during the day where there is light. (Many samples were taking during night, and these have been dropped.)
+This set of graph shows `alpha ~ Light` only for during the day, when there is light. (Many samples were taking during night, and these have been dropped.)
 
 ```{r alpha-graph-light-only, fig.show="hide", results="hide"}
 # color code by time, SOLR on the x axis
@@ -1200,9 +1223,9 @@ ggsave('fig4-1col.pdf', path = "./figures/", units = "mm", width = 89, height = 
 
 
 
-##### Other alpha graphs..
+##### Other alpha graphs...
 
-...where made, but are not included here.
+...where made, but are not included in the final document.
 
 ```{r alpha2, fig.width=8, eval=F, include=F}
 alpha.16s.2 <- ggplot(mdf.16s, aes(SOLR.W.m.m, value, color = Time..H.num))
@@ -1264,6 +1287,7 @@ alpha.16s.4
 ## RA graphs for bioplot
 
 Taxa, merged at the Family level, will be use as vectors in the biplot.
+(Note that the stacked bar plot shows taxa at the Class level.)
 
 ```{r biplot-prep-ra, fig.width=8, results="hide", fig.show="hide"}
 # Glom OTUs and transform to RA
