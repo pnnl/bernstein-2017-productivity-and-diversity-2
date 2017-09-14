@@ -1,10 +1,13 @@
 ### Primary and heterotrophic productivity relate to multi-kingdom diversity in a hypersaline mat
 
-Manuscript in preparation!
+Manuscript in press at [FEMS Microbiology Ecology](https://academic.oup.com/femsec). <br>
+Manuscript ID: FEMSEC-17-06-0295.R1 <br>
+Submitted date: 17-Jun-2017 <br>
+Accepted date: 14-Sep-2017
 
 This has also been called the **Orchard Project**, because incubations were performed in a orchard.
 
-Your Information Release has been approved by all reviewers. The IR number assigned to this Journal/Magazine/Newsletter Article is: PNNL-SA-127139.
+PNNL Information Release number assigned to this Journal Article is: PNNL-SA-127139.
 
 ---
 
