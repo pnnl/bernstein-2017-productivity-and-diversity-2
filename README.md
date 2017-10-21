@@ -1,9 +1,11 @@
 ### Primary and heterotrophic productivity relate to multi-kingdom diversity in a hypersaline mat
 
-Manuscript in press at [FEMS Microbiology Ecology](https://academic.oup.com/femsec). <br>
+Published in [FEMS Microbiology Ecology](https://academic.oup.com/femsec/article/doi/10.1093/femsec/fix121/4555378/). <br>
+Open access! (Download the [PDF](https://academic.oup.com/femsec/article-pdf/doi/10.1093/femsec/fix121/21308224/fix121.pdf)) <br>
 Manuscript ID: FEMSEC-17-06-0295.R1 <br>
-Submitted date: 17-Jun-2017 <br>
-Accepted date: 14-Sep-2017
+Submitted: 17 June 2017 <br>
+Accepted: 14 September 2017 <br>
+Published: 17 October 2017
 
 This has also been called the **Orchard Project**, because incubations were performed in a orchard.
 
